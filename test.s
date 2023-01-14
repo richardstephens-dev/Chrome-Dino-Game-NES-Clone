@@ -1,11 +1,12 @@
 ; This is a demo project for learning 6502 Assembly for the NES.
-; Test code from https://github.com/NesHacker/DevEnvironmentDemo/blob/main/demo.s
+; The goal is a bottom-to-top platformer called "Ghost in Limbo".
+; Boilerplate template from https://github.com/NesHacker/DevEnvironmentDemo/blob/main/demo.s
 .segment "HEADER"
   ; .byte "NES", $1A      ; iNES header identifier
   .byte $4E, $45, $53, $1A
   .byte 2               ; 2x 16KB PRG code
   .byte 1               ; 1x  8KB CHR data
-  .byte $01, $00        ; mapper 0, vertical mirroring
+  .byte $00, $00        ; mapper 0, mirroring: horizontal
 
 .segment "VECTORS"
   ;; When an NMI happens (once per frame if enabled) the label nmi:
@@ -29,7 +30,7 @@ reset:
   ldx #$ff 	; Set up stack
   txs		;  .
   inx		; now X = 0
-  stx $2000	; disable NMI
+  stx $2000	  ; disable NMI
   stx $2001 	; disable rendering
   stx $4010 	; disable DMC IRQs
 
@@ -56,100 +57,78 @@ vblankwait2:
   bit $2002
   bpl vblankwait2
 
-main:
-load_palettes:
-  lda $2002
-  lda #$3f
-  sta $2006
-  lda #$00
-  sta $2006
-  ldx #$00
-@loop:
-  lda palettes, x
-  sta $2007
-  inx
-  cpx #$20
-  bne @loop
+;; load all the palettes
+lda $2002 ; Read PPU status to reset address latch
+lda #$3f  ; Set the first palette address to 3F
+sta $2006 ; Set the PPU address
+ldy #$00  ; set the palette index to 0
+ldx #$00  ; set the palette color to 0
 
-enable_rendering:
-  lda #%10000000	; Enable NMI
-  sta $2000
-  lda #%00010000	; Enable Sprites
-  sta $2001
+load_palettes:
+  ; Get the first palette address and offset it by the palette index
+  lda #$3f
+  adc y
+  iny
+  ; if all 11 palettes have been loaded, continue
+  cpy #$0b
+  bne load_palette
+
+load_palette:
+  ; Load the current palette address
+  sta $2006
+  ; Load the current palette color
+  lda palette, x
+  sta $2007
+  ; Increment the palette color
+  inx
+  ; If less than 12 bytes, go to load_palette
+  cpx #$0c
+  bne load_palette
+  ; If not all 11 palettes have been loaded, go to load_palettes
+  cpy #$0b
+  bne load_palettes
+
+;; load CHR (sprites and backgrounds) data
+; Use DMA (direct memory access) $4014 to copy data from RAM to PPU
+; 
+  LDA #$00
+  STA $2003  ; set the low byte (00) of the RAM address
+  LDA #$02
+  STA $4014  ; set the high byte (02) of the RAM address, start the transfer
+
+;; Main game loop
+main:
+;; TODO: Add game code here
 
 forever:
   jmp forever
 
 nmi:
-  ldx #$00 	; Set SPR-RAM address to 0
-  stx $2003
-@loop:	lda hello, x 	; Load the hello message into SPR-RAM
-  sta $2004
-  inx
-  cpx #$1c
-  bne @loop
   rti
-
-hello:
-  .byte $00, $00, $00, $00 	; Why do I need these here?
-  .byte $00, $00, $00, $00
-  .byte $6c, $00, $00, $6c
-  .byte $6c, $01, $00, $76
-  .byte $6c, $02, $00, $80
-  .byte $6c, $02, $00, $8A
-  .byte $6c, $03, $00, $94
-
-palettes:
-  ; Background Palette
-  .byte $0f, $00, $00, $00
-  .byte $0f, $00, $00, $00
-  .byte $0f, $00, $00, $00
-  .byte $0f, $00, $00, $00
-
-  ; Sprite Palette
-  .byte $0f, $20, $00, $00
-  .byte $0f, $00, $00, $00
-  .byte $0f, $00, $00, $00
-  .byte $0f, $00, $00, $00
 
 ; Character memory
 .segment "CHARS"
-  .byte %11000011	; H (00)
-  .byte %11000011
-  .byte %11000011
-  .byte %11111111
-  .byte %11111111
-  .byte %11000011
-  .byte %11000011
-  .byte %11000011
-  .byte $00, $00, $00, $00, $00, $00, $00, $00
 
-  .byte %11111111	; E (01)
-  .byte %11111111
-  .byte %11000000
-  .byte %11111100
-  .byte %11111100
-  .byte %11000000
-  .byte %11111111
-  .byte %11111111
-  .byte $00, $00, $00, $00, $00, $00, $00, $00
-
-  .byte %11000000	; L (02)
-  .byte %11000000
-  .byte %11000000
-  .byte %11000000
-  .byte %11000000
-  .byte %11000000
-  .byte %11111111
-  .byte %11111111
-  .byte $00, $00, $00, $00, $00, $00, $00, $00
-
-  .byte %01111110	; O (03)
-  .byte %11100111
-  .byte %11000011
-  .byte %11000011
-  .byte %11000011
-  .byte %11000011
-  .byte %11100111
-  .byte %01111110
-  .byte $00, $00, $00, $00, $00, $00, $00, $00
+.segment "DATA"
+heaven_palette:
+  .byte $FF, $FF, $CC, $99, $99, $66, $00, $00, $00, $FF, $FF, $FF
+limbo_palette:
+  .byte $CC, $FF, $FF, $99, $99, $99, $FF, $FF, $CC, $00, $00, $00
+lust_palette:
+  .byte $FF, $00, $00, $FF, $99, $00, $FF, $CC, $99, $00, $00, $00
+gluttony_palette:
+  .byte $66, $00, $66, $00, $66, $00, $66, $33, $00, $00, $00, $00
+avarice_palette:
+  .byte $00, $00, $66, $00, $00, $00, $66, $66, $66, $FF, $FF, $FF
+wrath_palette:
+  .byte $FF, $33, $00, $FF, $66, $00, $FF, $FF, $00, $00, $00, $00
+heresy_palette:
+  .byte $66, $00, $99, $00, $00, $99, $00, $00, $00, $FF, $FF, $FF
+violence_palette:
+  .byte $FF, $00, $00, $FF, $66, $00, $00, $00, $00, $FF, $FF, $FF
+fraud_palette:
+  .byte $00, $99, $00, $66, $00, $99, $00, $00, $99, $00, $00, $00
+treachery_palette:
+  .byte $00, $00, $66, $66, $00, $66, $00, $00, $00, $FF, $FF, $FF
+ghost_palette:
+  .byte $FF, $FF, $FF, $CC, $CC, $CC, $99, $99, $99, $00, $00, $00
