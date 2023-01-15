@@ -85,22 +85,22 @@ forever:
 nmi:
   ldx #$00 	; Set SPR-RAM address to 0
   stx $2003
-@loop:	lda ghost, x 	; Load the hello message into SPR-RAM
+@loop:	lda ghost, x 	; Load the ghost message into SPR-RAM
   sta $2004
   inx
-  cpx #$18
+  cpx #$20            ; 32 bytes in the message "GHOST"
   bne @loop
   rti
 
 ; Write the message to be displayed in the sprite memory
 ghost:
-  .byte $00, $00, $00, $00 	; Why do I need these here?
-  .byte $00, $00, $00, $00
-  .byte $6c, $00, $00, $6c
-  .byte $6c, $01, $00, $76
-  .byte $6c, $02, $00, $80
-  .byte $6c, $02, $00, $8A
-  .byte $6c, $03, $00, $94
+  .byte $00, $00, $00, $00 	; Padding
+  .byte $00, $00, $00, $00  ; $6c is the jmp instruction.
+  .byte $6c, $00, $00, $6c  ; G
+  .byte $6c, $01, $00, $76  ; H
+  .byte $6c, $02, $00, $80  ; O
+  .byte $6c, $03, $00, $8A  ; S
+  .byte $6c, $04, $00, $94  ; T
 
 palettes:
   ; Background Palette
