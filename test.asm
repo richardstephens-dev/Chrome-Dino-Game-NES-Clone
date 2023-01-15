@@ -43,12 +43,14 @@ clear_memory:
   lda #$00
   sta $0000, x
   sta $0100, x
-  sta $0200, x
   sta $0300, x
   sta $0400, x
   sta $0500, x
   sta $0600, x
   sta $0700, x
+  lda #$ff
+  sta $0200, x ; for storing chr data
+  lda #$00
   inx
   bne clear_memory
 
@@ -57,110 +59,90 @@ vblankwait2:
   bit $2002
   bpl vblankwait2
 
-main:
-load_palettes:
+;; set up PPU
   lda $2002
+  sta $4014
+  nop
+
+;; set up CHR memory
   lda #$3f
   sta $2006
   lda #$00
   sta $2006
+
+;; load chr data
   ldx #$00
-@loop:
+
+  lda #$3f
+  sta $2006
+  lda #$00
+  sta $2006
+
+;; load palettes 
+  ldx #$00
+load_palettes:
   lda palettes, x
   sta $2007
   inx
   cpx #$20
-  bne @loop
+  bne load_palettes
 
-enable_rendering:
-  lda #%10000000	; Enable NMI
+;; load sprites
+  ldx #$00
+load_sprites:
+  lda sprites, x
+  sta $0200, x
+  inx
+  cpx #$20  ; 32 bytes
+  bne load_sprites
+
+;; clear the nametables
+  ldx #$00
+  ldy #$00
+  lda $2002
+  lda #$20
+  sta $2006
+  lda #$00
+  sta $2006
+clear_nametable:
+  sta $2007
+  inx
+  bne clear_nametable
+  iny
+  cpy #$08
+  bne clear_nametable
+
+; enable interrupts
+  cli
+
+; enable NMI
+  lda #%10010000 ; enable NMI, change background color to use second set of chr tiles
   sta $2000
-  lda #%00010000	; Enable Sprites
+  lda #%00011110 ; enable sprites and background
   sta $2001
 
 forever:
   jmp forever
 
 nmi:
-  ldx #$00 	; Set SPR-RAM address to 0
-  stx $2003
-@loop:	lda ghost, x 	; Load the hello message into SPR-RAM
-  sta $2004
-  inx
-  cpx #$1c
-  bne @loop
+  lda #$02  ; copy sprite data from $0200 to ppu memory
+  sta $4014
   rti
 
-ghost:
-  .byte $00, $00, $00, $00 	; Why do I need these here?
-  .byte $00, $00, $00, $00
-  .byte $6c, $00, $00, $6c
-  .byte $6c, $01, $00, $76
-  .byte $6c, $02, $00, $80
-  .byte $6c, $03, $00, $8A
-  .byte $6c, $04, $00, $94
-
 palettes:
-  ; Background Palette
-  .byte $0f, $20, $00, $00
-  .byte $0f, $00, $00, $00
-  .byte $0f, $00, $00, $00
-  .byte $0f, $00, $00, $00
+  .byte $22,$29,$1A,$0F,$22,$36,$17,$0f,$22,$30,$21,$0f,$22,$27,$17,$0F  ;background palette data
+  .byte $22,$16,$27,$18,$22,$1A,$30,$27,$22,$16,$30,$27,$22,$0F,$36,$17  ;sprite palette data
 
-  ; Sprite Palette
-  .byte $1f, $10, $20, $10
-  .byte $0f, $00, $00, $00
-  .byte $0f, $00, $00, $00
-  .byte $0f, $00, $00, $00
+sprites:
+  .byte $08, $00, $00, $08
+  .byte $08, $01, $00, $10
+  .byte $10, $02, $00, $08
+  .byte $10, $03, $00, $10
+  .byte $18, $04, $00, $08
+  .byte $18, $05, $00, $10
+  .byte $20, $06, $00, $08
+  .byte $20, $07, $00, $10
 
 ; Character memory
 .segment "CHARS"
-  .byte %11111111 ; G (00)
-  .byte %11111111
-  .byte %11000000
-  .byte %11011111
-  .byte %11011111
-  .byte %11000011
-  .byte %11111111
-  .byte %11111111
-  .byte $00, $00, $00, $00, $00, $00, $00, $00
-
-  .byte %11000011	; H (01)
-  .byte %11000011
-  .byte %11000011
-  .byte %11111111
-  .byte %11111111
-  .byte %11000011
-  .byte %11000011
-  .byte %11000011
-  .byte $00, $00, $00, $00, $00, $00, $00, $00
-
-  .byte %01111110	; O (02)
-  .byte %11100111
-  .byte %11000011
-  .byte %11000011
-  .byte %11000011
-  .byte %11000011
-  .byte %11100111
-  .byte %01111110
-  .byte $00, $00, $00, $00, $00, $00, $00, $00
-
-  .byte %11111111	; S (03)
-  .byte %11111111
-  .byte %11000000
-  .byte %11111111
-  .byte %11111111
-  .byte %00000011
-  .byte %11111111
-  .byte %11111111
-  .byte $00, $00, $00, $00, $00, $00, $00, $00
-
-  .byte %11111111	; T (04)
-  .byte %11111111
-  .byte %00011000
-  .byte %00011000
-  .byte %00011000
-  .byte %00011000
-  .byte %00011000
-  .byte %00011000
-  .byte $00, $00, $00, $00, $00, $00, $00, $00
+  .incbin "hellomario.chr"
