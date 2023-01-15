@@ -16,11 +16,12 @@
   ;; External interrupt IRQ (unused)
   .addr 0
 
+.segment "ZEROPAGE"
+; variable to hold world data pointer
+world: .res 2
+
 ; "nes" linker config requires a STARTUP section, even if it's empty
 .segment "STARTUP"
-
-; Main code segment for the program
-.segment "CODE"
 
 reset:
   sei		; disable IRQs
@@ -60,7 +61,7 @@ vblankwait2:
   bpl vblankwait2
 
 ;; set up PPU
-  lda $2002
+  lda #$02
   sta $4014
   nop
 
@@ -87,30 +88,64 @@ load_palettes:
   cpx #$20
   bne load_palettes
 
+;; load world data TUTORIAL
+  ; initialize world var to point to the start of the world data
+  lda #<world_data ; lo byte
+  sta world ; store in world var
+  lda #>world_data ; hi byte
+  sta world+1 ; store in world var
+
+  ; set up address in PPU memory for world -> nametable data
+  ; using table at $2000
+  ; first reset ppu latch
+  bit $2002
+  lda #$20
+  sta $2006 ; hi byte
+  lda #$00
+  sta $2006 ; lo byte
+
+  ldx #$00 ; index to count how many times we got to 255
+  ldy #$00 ; index to 255  
+load_world_data:
+  lda (world), y
+  sta $2007
+  iny
+  ; check x is 3. if not equal skip cpy
+  cpx #$03
+  bne :+
+  ; otherwise check if y is 192
+  cpy #$c0
+  beq done_loading_world_data
+:
+  ; check if y is 0
+  cpy #$00
+  bne load_world_data
+  ; otherwise increment x
+  inx
+  ; update world pointer
+  inc world+1
+  jmp load_world_data
+
+done_loading_world_data:
+
+;; set up attribute table
+  ldx #$00
+set_attrs:
+  lda #$55
+  sta $2007
+  inx
+  cpx #$40 ; 64 bytes
+  bne set_attrs
+
 ;; load sprites
   ldx #$00
+  ldy #$00
 load_sprites:
   lda sprites, x
   sta $0200, x
   inx
   cpx #$20  ; 32 bytes
   bne load_sprites
-
-;; clear the nametables
-  ldx #$00
-  ldy #$00
-  lda $2002
-  lda #$20
-  sta $2006
-  lda #$00
-  sta $2006
-clear_nametable:
-  sta $2007
-  inx
-  bne clear_nametable
-  iny
-  cpy #$08
-  bne clear_nametable
 
 ; enable interrupts
   cli
@@ -132,6 +167,10 @@ nmi:
 palettes:
   .byte $22,$29,$1A,$0F,$22,$36,$17,$0f,$22,$30,$21,$0f,$22,$27,$17,$0F  ;background palette data
   .byte $22,$16,$27,$18,$22,$1A,$30,$27,$22,$16,$30,$27,$22,$0F,$36,$17  ;sprite palette data
+
+; TUTORIAL
+world_data:
+  .incbin "world.bin"
 
 sprites:
   .byte $08, $00, $00, $08
