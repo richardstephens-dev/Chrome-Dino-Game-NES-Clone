@@ -2,11 +2,11 @@
 ; The goal is a bottom-to-top platformer called "Ghost in Limbo".
 ; Boilerplate template from https://github.com/NesHacker/DevEnvironmentDemo/blob/main/demo.s
 .segment "HEADER"
-  ;.byte "NES", $1A      ; iNES header identifier
+  ; .byte "NES", $1A      ; iNES header identifier
   .byte $4E, $45, $53, $1A
   .byte 2               ; 2x 16KB PRG code
   .byte 1               ; 1x  8KB CHR data
-  .byte $00, $00        ; mapper 0, mirroring: horizontal
+  .byte $01, $00        ; mapper 0, vertical mirroring
 
 .segment "VECTORS"
   ;; When an NMI happens (once per frame if enabled) the label nmi:
@@ -30,7 +30,7 @@ reset:
   ldx #$ff 	; Set up stack
   txs		;  .
   inx		; now X = 0
-  stx $2000	  ; disable NMI
+  stx $2000	; disable NMI
   stx $2001 	; disable rendering
   stx $4010 	; disable DMC IRQs
 
@@ -57,20 +57,19 @@ vblankwait2:
   bit $2002
   bpl vblankwait2
 
-;; load palette
 main:
 load_palettes:
-  lda $2002     ; Read PPU status to reset address latch
-  lda #$3f      ; First palette address
-  sta $2006     ; Set PPU address lo byte of #3f00 (palette 0)
-  lda #$00      ; Start at 0
-  sta $2006     ; Set PPU address hi byte of #3f00 (palette 0)
-  ldx #$00      ; Start at 0
+  lda $2002
+  lda #$3f
+  sta $2006
+  lda #$00
+  sta $2006
+  ldx #$00
 @loop:
   lda palettes, x
-  sta $2007     ; Write palette data
+  sta $2007
   inx
-  cpx #$0c      ; 12 bytes per palette
+  cpx #$20
   bne @loop
 
 enable_rendering:
@@ -85,32 +84,31 @@ forever:
 nmi:
   ldx #$00 	; Set SPR-RAM address to 0
   stx $2003
-@loop:	lda ghost, x 	; Load the ghost message into SPR-RAM
+@loop:	lda ghost, x 	; Load the hello message into SPR-RAM
   sta $2004
   inx
-  cpx #$20            ; 32 bytes in the message "GHOST"
+  cpx #$1c
   bne @loop
   rti
 
-; Write the message to be displayed in the sprite memory
 ghost:
-  .byte $00, $00, $00, $00 	; Padding
-  .byte $00, $00, $00, $00  ; $6c is the jmp instruction.
-  .byte $6c, $00, $00, $6c  ; G
-  .byte $6c, $01, $00, $76  ; H
-  .byte $6c, $02, $00, $80  ; O
-  .byte $6c, $03, $00, $8A  ; S
-  .byte $6c, $04, $00, $94  ; T
+  .byte $00, $00, $00, $00 	; Why do I need these here?
+  .byte $00, $00, $00, $00
+  .byte $6c, $00, $00, $6c
+  .byte $6c, $01, $00, $76
+  .byte $6c, $02, $00, $80
+  .byte $6c, $03, $00, $8A
+  .byte $6c, $04, $00, $94
 
 palettes:
   ; Background Palette
-  .byte $0f, $00, $00, $00
+  .byte $0f, $20, $00, $00
   .byte $0f, $00, $00, $00
   .byte $0f, $00, $00, $00
   .byte $0f, $00, $00, $00
 
   ; Sprite Palette
-  .byte $0f, $20, $00, $00
+  .byte $1f, $10, $20, $10
   .byte $0f, $00, $00, $00
   .byte $0f, $00, $00, $00
   .byte $0f, $00, $00, $00
