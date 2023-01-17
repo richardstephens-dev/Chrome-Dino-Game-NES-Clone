@@ -110,19 +110,14 @@ load_world_data:
   lda (world), y
   sta $2007
   iny
-  ; check x is 3. if not equal skip cpy
   cpx #$03
   bne :+
-  ; otherwise check if y is 192
   cpy #$c0
   beq done_loading_world_data
 :
-  ; check if y is 0
   cpy #$00
   bne load_world_data
-  ; otherwise increment x
   inx
-  ; update world pointer
   inc world+1
   jmp load_world_data
 
@@ -146,45 +141,6 @@ load_sprites:
   cpx #$20  ; 32 bytes
   bne load_sprites
 
-get_controller_input:
-  lda #$01
-  sta $4016
-  lda #$00
-  sta $4016
-
-  lda $4016 ; p1 a
-  and #%00000001
-  lda $4016 ; p1 b
-  and #%00000001
-  lda $4016 ; p1 select
-  and #%00000001
-  lda $4016 ; p1 start
-  and #%00000001
-  lda $4016 ; p1 up
-  and #%00000001
-  lda $4016 ; p1 down
-  and #%00000001
-  lda $4016 ; p1 left
-  and #%00000001
-  lda $4016 ; p1 right
-  and #%00000001
-
-  lda $4017 ; p2 a
-  and #%00000001
-  lda $4017 ; p2 b
-  and #%00000001
-  lda $4017 ; p2 select
-  and #%00000001
-  lda $4017 ; p2 start
-  and #%00000001
-  lda $4017 ; p2 up
-  and #%00000001
-  lda $4017 ; p2 down
-  and #%00000001
-  lda $4017 ; p2 left
-  and #%00000001
-  lda $4017 ; p2 right
-
 ; enable interrupts
   cli
 
@@ -198,8 +154,52 @@ forever:
   jmp forever
 
 nmi:
+  lda #$00
+  sta $2003
   lda #$02  ; copy sprite data from $0200 to ppu memory
   sta $4014
+
+latch_controller:
+  lda #$01
+  sta $4016
+  lda #$00
+  sta $4016
+
+get_controller_input:
+  lda $4016 ; p1 a
+  and #%00000001
+  beq a_done
+  ldx #$00
+read_a:
+  lda $0203, x
+  clc
+  adc #$01
+  sta $0203, x
+  inx
+  inx
+  inx
+  inx
+  cpx #$20
+  bne read_a
+a_done:
+
+  lda $4016 ; p1 b
+  and #%00000001
+  beq b_done
+  ldx #$00
+read_b:
+  lda $0203, x
+  sec
+  sbc #$01
+  sta $0203, x
+  inx
+  inx
+  inx
+  inx
+  cpx #$20
+  bne read_b
+b_done:
+
   rti
 
 palettes:
