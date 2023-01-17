@@ -137,7 +137,6 @@ set_attrs:
   cpx #$40 ; 64 bytes
   bne set_attrs
 
-;; load sprites
   ldx #$00
   ldy #$00
 load_sprites:
@@ -146,6 +145,45 @@ load_sprites:
   inx
   cpx #$20  ; 32 bytes
   bne load_sprites
+
+get_controller_input:
+  lda #$01
+  sta $4016
+  lda #$00
+  sta $4016
+
+  lda $4016 ; p1 a
+  and #%00000001
+  lda $4016 ; p1 b
+  and #%00000001
+  lda $4016 ; p1 select
+  and #%00000001
+  lda $4016 ; p1 start
+  and #%00000001
+  lda $4016 ; p1 up
+  and #%00000001
+  lda $4016 ; p1 down
+  and #%00000001
+  lda $4016 ; p1 left
+  and #%00000001
+  lda $4016 ; p1 right
+  and #%00000001
+
+  lda $4017 ; p2 a
+  and #%00000001
+  lda $4017 ; p2 b
+  and #%00000001
+  lda $4017 ; p2 select
+  and #%00000001
+  lda $4017 ; p2 start
+  and #%00000001
+  lda $4017 ; p2 up
+  and #%00000001
+  lda $4017 ; p2 down
+  and #%00000001
+  lda $4017 ; p2 left
+  and #%00000001
+  lda $4017 ; p2 right
 
 ; enable interrupts
   cli
@@ -173,15 +211,13 @@ world_data:
   .incbin "world.bin"
 
 sprites:
-  .byte $08, $00, $00, $08
-  .byte $08, $01, $00, $10
-  .byte $10, $02, $00, $08
-  .byte $10, $03, $00, $10
-  .byte $18, $04, $00, $08
-  .byte $18, $05, $00, $10
-  .byte $20, $06, $00, $08
-  .byte $20, $07, $00, $10
-
-; Character memory
+  .byte $20, $00, %11000000, $10
+  .byte $20, $01, %11000000, $08
+  .byte $18, $02, %11000000, $10
+  .byte $18, $03, %11000000, $08
+  .byte $10, $04, %11000000, $10
+  .byte $10, $05, %11000000, $08
+  .byte $08, $06, %11000000, $10
+  .byte $08, $07, %11000000, $08; Character memory
 .segment "CHARS"
   .incbin "hellomario.chr"
