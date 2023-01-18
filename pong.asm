@@ -19,9 +19,20 @@
 .segment "ZEROPAGE"
 ; variable to hold world data pointer
 world: .res 2
+score: .res 1
+buttons: .res 1
 
-; "nes" linker config requires a STARTUP section, even if it's empty
+RIGHTWALL =$02
+LEFTWALL =$F6
+BOTTOMWALL =$D8
+TOPWALL =$20
+
 .segment "STARTUP"
+
+vblankwait:
+  bit $2002
+  bpl vblankwait
+  rts
 
 reset:
   sei		; disable IRQs
@@ -35,10 +46,7 @@ reset:
   stx $2001 	; disable rendering
   stx $4010 	; disable DMC IRQs
 
-;; first wait for vblank to make sure PPU is ready
-vblankwait1:
-  bit $2002
-  bpl vblankwait1
+  jsr vblankwait
 
 clear_memory:
   lda #$00
@@ -54,11 +62,8 @@ clear_memory:
   lda #$00
   inx
   bne clear_memory
-
-;; second wait for vblank, PPU is ready after this
-vblankwait2:
-  bit $2002
-  bpl vblankwait2
+  
+  jsr vblankwait
 
 ;; set up PPU
   lda #$02
@@ -153,28 +158,42 @@ load_sprites:
 forever:
   jmp forever
 
-nmi:
-  lda #$00
-  sta $2003
-  lda #$02  ; copy sprite data from $0200 to ppu memory
-  sta $4014
+move_right:
+  lda $0203, x
+  sec
+  sbc #$01
+  sta $0203, x
+  rts
 
-latch_controller:
+move_left:
+  lda $0203, x
+  clc
+  adc #$01
+  sta $0203, x
+  rts
+
+read_controller_input:
+; latch controller input
   lda #$01
   sta $4016
   lda #$00
   sta $4016
 
-get_controller_input:
-  lda $4016 ; p1 a
-  and #%00000001
+; read controller input
+  ldx #$08
+read_buttons:
+  lda $4016
+  lsr a
+  rol buttons ; push last bit into carry flag and out again
+  dex
+  bne read_buttons
+
+  lda buttons ; p1 a
+  and #%10000000
   beq a_done
   ldx #$00
 read_a:
-  lda $0203, x
-  clc
-  adc #$01
-  sta $0203, x
+  jsr move_left
   inx
   inx
   inx
@@ -183,15 +202,12 @@ read_a:
   bne read_a
 a_done:
 
-  lda $4016 ; p1 b
-  and #%00000001
+  lda buttons ; p1 a
+  and #%01000000
   beq b_done
   ldx #$00
 read_b:
-  lda $0203, x
-  sec
-  sbc #$01
-  sta $0203, x
+  jsr move_right
   inx
   inx
   inx
@@ -199,6 +215,15 @@ read_b:
   cpx #$20
   bne read_b
 b_done:
+  rts
+
+nmi:
+  lda #$00
+  sta $2003
+  lda #$02  ; copy sprite data from $0200 to ppu memory
+  sta $4014
+
+  jsr read_controller_input
 
   rti
 
