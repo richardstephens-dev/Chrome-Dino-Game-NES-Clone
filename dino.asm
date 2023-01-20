@@ -87,18 +87,18 @@ load_palettes:
 
   ldx #$00
   ldy #$00
-load_sprites:
-  lda sprites, x
+load_paddle_sprite:
+  lda paddle_sprite, x
   sta $0200, x
   inx
   cpx #$20  ; 32 bytes
-  bne load_sprites
+  bne load_paddle_sprite
 
 ; enable interrupts
   cli
 
 ; enable NMI
-  lda #%10011000 ; ppuctrl
+  lda #%10010000 ; ppuctrl
   sta $2000
   lda #%00011110
   sta $2001
@@ -174,18 +174,17 @@ nmi:
   rti
 
 palettes:
-  .byte $22,$29,$1A,$0F,$22,$36,$17,$0f,$22,$30,$21,$0f,$22,$27,$17,$0F  ;background palette data
-  .byte $22,$16,$27,$18,$22,$1A,$30,$27,$22,$16,$30,$27,$22,$0F,$36,$17  ;sprite palette data
+  .byte $0F,$1C,$1C,$1C,$0F,$1C,$1C,$1C,$0F,$1C,$1C,$1C,$0F,$1C,$1C,$1C  ;sprite palette data
 
-sprites:
+paddle_sprite:
   ; y, tile, attributes, x
   .byte $08, $f9, %11000000, $08
-  .byte $08, $f9, %10000000, $10
-  .byte $10, $f8, %00000000, $08
-  .byte $10, $f8, %00000000, $10
+  .byte $08, $f9, %10000001, $10
+  .byte $10, $f8, %00000010, $08
+  .byte $10, $f8, %00000011, $10
   .byte $18, $f8, %00000000, $08
   .byte $18, $f8, %00000000, $10
   .byte $20, $f9, %01000000, $08
   .byte $20, $f9, %00000000, $10
 .segment "CHARS"
-  .incbin "hellomario.chr"
+  .incbin "dino.chr"
