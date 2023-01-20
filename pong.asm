@@ -17,8 +17,6 @@
   .addr 0
 
 .segment "ZEROPAGE"
-; variable to hold world data pointer
-world: .res 2
 score: .res 1
 buttons: .res 1
 
@@ -70,12 +68,6 @@ clear_memory:
   sta $4014
   nop
 
-;; set up CHR memory
-  lda #$3f
-  sta $2006
-  lda #$00
-  sta $2006
-
 ;; load chr data
   ldx #$00
 
@@ -93,50 +85,6 @@ load_palettes:
   cpx #$20
   bne load_palettes
 
-;; load world data TUTORIAL
-  ; initialize world var to point to the start of the world data
-  lda #<world_data ; lo byte
-  sta world ; store in world var
-  lda #>world_data ; hi byte
-  sta world+1 ; store in world var
-
-  ; set up address in PPU memory for world -> nametable data
-  ; using table at $2000
-  ; first reset ppu latch
-  bit $2002
-  lda #$20
-  sta $2006 ; hi byte
-  lda #$00
-  sta $2006 ; lo byte
-
-  ldx #$00 ; index to count how many times we got to 255
-  ldy #$00 ; index to 255  
-load_world_data:
-  lda (world), y
-  sta $2007
-  iny
-  cpx #$03
-  bne :+
-  cpy #$c0
-  beq done_loading_world_data
-:
-  cpy #$00
-  bne load_world_data
-  inx
-  inc world+1
-  jmp load_world_data
-
-done_loading_world_data:
-
-;; set up attribute table
-  ldx #$00
-set_attrs:
-  lda #$55
-  sta $2007
-  inx
-  cpx #$40 ; 64 bytes
-  bne set_attrs
-
   ldx #$00
   ldy #$00
 load_sprites:
@@ -150,30 +98,30 @@ load_sprites:
   cli
 
 ; enable NMI
-  lda #%10010000 ; enable NMI, change background color to use second set of chr tiles
+  lda #%10011000 ; ppuctrl
   sta $2000
-  lda #%00011110 ; enable sprites and background
+  lda #%00011110
   sta $2001
 
 forever:
   jmp forever
 
-move_right:
-  lda $0203, x
+move_up:
+  lda $0200, x
   sec
   sbc #$01
-  sta $0203, x
+  sta $0200, x
   rts
 
-move_left:
-  lda $0203, x
+move_down:
+  lda $0200, x
   clc
   adc #$01
-  sta $0203, x
+  sta $0200, x
   rts
 
 read_controller_input:
-; latch controller input
+latch_controller_input:
   lda #$01
   sta $4016
   lda #$00
@@ -181,68 +129,63 @@ read_controller_input:
 
 ; read controller input
   ldx #$08
-read_buttons:
+read_downuttons:
   lda $4016
   lsr a
-  rol buttons ; push last bit into carry flag and out again
+  rol buttons
   dex
-  bne read_buttons
+  bne read_downuttons
 
-  lda buttons ; p1 a
-  and #%10000000
-  beq a_done
+  lda buttons ; p1 up
+  and #%00001000
+  beq up_done
   ldx #$00
-read_a:
-  jsr move_left
+read_up:
+  jsr move_up
   inx
   inx
   inx
   inx
   cpx #$20
-  bne read_a
-a_done:
+  bne read_up
+up_done:
 
-  lda buttons ; p1 a
-  and #%01000000
-  beq b_done
+  lda buttons ; p1 down
+  and #%00000100
+  beq down_done
   ldx #$00
-read_b:
-  jsr move_right
+read_down:
+  jsr move_down
   inx
   inx
   inx
   inx
   cpx #$20
-  bne read_b
-b_done:
+  bne read_down
+down_done:
   rts
 
 nmi:
   lda #$00
   sta $2003
-  lda #$02  ; copy sprite data from $0200 to ppu memory
+  lda #$02
   sta $4014
-
   jsr read_controller_input
-
   rti
 
 palettes:
   .byte $22,$29,$1A,$0F,$22,$36,$17,$0f,$22,$30,$21,$0f,$22,$27,$17,$0F  ;background palette data
   .byte $22,$16,$27,$18,$22,$1A,$30,$27,$22,$16,$30,$27,$22,$0F,$36,$17  ;sprite palette data
 
-; TUTORIAL
-world_data:
-  .incbin "world.bin"
-
 sprites:
-  .byte $20, $00, %11000000, $10
-  .byte $20, $01, %11000000, $08
-  .byte $18, $02, %11000000, $10
-  .byte $18, $03, %11000000, $08
-  .byte $10, $04, %11000000, $10
-  .byte $10, $05, %11000000, $08
-  .byte $08, $06, %11000000, $10
-  .byte $08, $07, %11000000, $08; Character memory
+  ; y, tile, attributes, x
+  .byte $08, $f9, %11000000, $08
+  .byte $08, $f9, %10000000, $10
+  .byte $10, $f8, %00000000, $08
+  .byte $10, $f8, %00000000, $10
+  .byte $18, $f8, %00000000, $08
+  .byte $18, $f8, %00000000, $10
+  .byte $20, $f9, %01000000, $08
+  .byte $20, $f9, %00000000, $10
 .segment "CHARS"
   .incbin "hellomario.chr"
