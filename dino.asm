@@ -19,6 +19,7 @@
 .segment "ZEROPAGE"
 score: .res 1
 buttons: .res 1
+game_state: .res 1
 
 RIGHTWALL =$02
 LEFTWALL =$F6
@@ -82,17 +83,47 @@ load_palettes:
   lda palettes, x
   sta $2007
   inx
-  cpx #$20
+  cpx #$20 ; 12*4 = 48 bytes in hex = 0x30
   bne load_palettes
 
+;; load dino sprite
   ldx #$00
   ldy #$00
-load_paddle_sprite:
-  lda paddle_sprite, x
+load_dino_sprite:
+  lda dino_sprite, x
   sta $0200, x
   inx
-  cpx #$20  ; 32 bytes
-  bne load_paddle_sprite
+  cpx #$30  ; 32 bytes
+  bne load_dino_sprite
+
+;; load nametable
+load_nametable:
+  lda $2002
+  lda #$20
+  sta $2006
+  lda #$00
+  sta $2006
+  ldx #$00
+load_nametable_loop:
+  lda nametable, x
+  sta $2007
+  inx
+  cpx #$40 ; 64 bytes
+  bne load_nametable_loop
+
+;; load attributes
+load_attributes:
+  lda #$23
+  sta $2006
+  lda #$00
+  sta $2006
+  ldx #$00
+load_attributes_loop:
+  lda #$00
+  sta $2007
+  inx
+  cpx #$10 ; 16 bytes
+  bne load_attributes_loop
 
 ; enable interrupts
   cli
@@ -106,18 +137,17 @@ load_paddle_sprite:
 forever:
   jmp forever
 
-move_up:
+jump:
   lda $0200, x
   sec
   sbc #$01
   sta $0200, x
-  rts
-
-move_down:
-  lda $0200, x
-  clc
-  adc #$01
-  sta $0200, x
+  inx
+  inx
+  inx
+  inx
+  cpx #$30
+  bne jump
   rts
 
 read_controller_input:
@@ -129,40 +159,20 @@ latch_controller_input:
 
 ; read controller input
   ldx #$08
-read_downuttons:
+read_buttons:
   lda $4016
   lsr a
   rol buttons
   dex
-  bne read_downuttons
+  bne read_buttons
 
-  lda buttons ; p1 up
-  and #%00001000
-  beq up_done
+  lda buttons ; p1 a
+  and #%10000000
+  beq a_done
   ldx #$00
-read_up:
-  jsr move_up
-  inx
-  inx
-  inx
-  inx
-  cpx #$20
-  bne read_up
-up_done:
-
-  lda buttons ; p1 down
-  and #%00000100
-  beq down_done
-  ldx #$00
-read_down:
-  jsr move_down
-  inx
-  inx
-  inx
-  inx
-  cpx #$20
-  bne read_down
-down_done:
+read_a:
+  jsr jump
+a_done:
   rts
 
 nmi:
@@ -174,17 +184,52 @@ nmi:
   rti
 
 palettes:
-  .byte $0F,$1C,$1C,$1C,$0F,$1C,$1C,$1C,$0F,$1C,$1C,$1C,$0F,$1C,$1C,$1C  ;sprite palette data
+  .byte $0f,$00,$30,$0f,$0f,$00,$30,$0f,$0f,$00,$30,$0f,$0f,$00,$30,$0f
+  .byte $0f,$00,$30,$0f,$0f,$00,$30,$0f,$0f,$00,$30,$0f,$0f,$00,$30,$0f
 
-paddle_sprite:
-  ; y, tile, attributes, x
-  .byte $08, $f9, %11000000, $08
-  .byte $08, $f9, %10000001, $10
-  .byte $10, $f8, %00000010, $08
-  .byte $10, $f8, %00000011, $10
-  .byte $18, $f8, %00000000, $08
-  .byte $18, $f8, %00000000, $10
-  .byte $20, $f9, %01000000, $08
-  .byte $20, $f9, %00000000, $10
+nametable:
+  .byte $04,$05,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04
+  .byte $04,$05,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04
+  .byte $04,$05,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04
+  .byte $04,$05,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04
+  .byte $04,$05,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04
+  .byte $04,$05,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04
+  .byte $04,$05,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04
+  .byte $04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04
+  .byte $04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04
+  .byte $04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04
+  .byte $04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04
+  .byte $04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04
+  .byte $04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04
+  .byte $04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04
+  .byte $04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04
+  .byte $04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04,$04
+
+attribute:
+  .byte %00000000,%00000000,%00000000,%00000000,%00000000,%00000000,%00000000,%00000000
+  .byte %00000000,%00000000,%00000000,%00000000,%00000000,%00000000,%00000000,%00000000
+
+dino_sprite:
+  ; .byte y, tile, attributes, x
+  ; attributes: 
+  ; 76543210
+  ; ||||||||
+  ; ||||||++- Palette (4 to 7) of sprite
+  ; |||+++--- Unimplemented (read 0)
+  ; ||+------ Priority (0: in front of background; 1: behind background)
+  ; |+------- Flip sprite horizontally
+  ; +-------- Flip sprite vertically
+  .byte $88, $04, %00000000, $20 ; 
+  .byte $88, $05, %00000000, $28
+  .byte $90, $12, %00000000, $10
+  .byte $90, $13, %00000000, $18
+  .byte $90, $14, %00000000, $20
+  .byte $90, $15, %00000000, $28
+  .byte $98, $22, %00000000, $10
+  .byte $98, $23, %00000000, $18
+  .byte $98, $24, %00000000, $20
+  .byte $a0, $32, %00000000, $10
+  .byte $a0, $33, %00000000, $18
+  .byte $a0, $34, %00000000, $20
 .segment "CHARS"
   .incbin "dino.chr"
