@@ -312,6 +312,7 @@ nametable_swap_check_done:
   rts
 
 animate_sprites:
+  bit $2002
   ldx #$00
 animation_swap_check:
   lda scroll
@@ -324,7 +325,6 @@ animation_swap:
   sta animation_flag
 animation_swap_check_done:
 
-  bit $2002
   ; pterodactyl
 
   ; dino
