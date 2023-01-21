@@ -22,8 +22,12 @@ buttons: .res 1
 game_state: .res 1
 nametable_id: .res 1
 scroll: .res 1
+scroll_speed: .res 1
 nametable_2000_index: .res 2
 nametable_2400_index: .res 2
+animation_flag: .res 1
+jumping_flag: .res 1
+crouching_flag: .res 1
 
 RIGHTWALL =$02
 LEFTWALL =$F6
@@ -90,14 +94,22 @@ load_palettes:
   cpx #$20
   bne load_palettes
 
-;; load dino sprite
   ldx #$00
-load_dino_sprite:
-  lda dino_sprite, x
+load_sprites:
+  lda sprites, x
   sta $0200, x
   inx
-  cpx #$30  ; 32 bytes
-  bne load_dino_sprite
+  cpx #$6c ; 108 decimal -> 6c hex
+  bne load_sprites
+
+;; load large_cactus sprite
+;; load small_cactus sprite
+;; load large_cactus_cluster sprite
+;; load small_cactus_cluster sprite
+;; load mixed_cactus_cluster sprite
+;; load cloud sprite
+;; load pterodactyl sprite
+;; load game_over sprite
 
 ;; nametables
 load_nametables:
@@ -216,12 +228,16 @@ set_nametable_2400_attrs:
 forever:
   jmp forever
 
-start_game:
+init_game:
   lda #$01
   sta game_state
-  ; show score
+  sta scroll_speed
+  sta animation_flag
+  ; TODO: make score appear on screen
   lda #$00
   sta score
+  sta jumping_flag
+  sta crouching_flag
   rts
 
 jump:
@@ -261,7 +277,7 @@ read_a:
   lda game_state
   cmp #$01
   beq :+
-  jsr start_game
+  jsr init_game
 :
   jsr jump
 a_done:
@@ -271,7 +287,12 @@ scroll_level:
   lda #$00
   sta $2006
   sta $2006
+  ldx #$00
+:
   inc scroll
+  inx
+  cpx scroll_speed
+  bne :-
 nametable_swap_check:
   lda scroll
   bne nametable_swap_check_done
@@ -290,6 +311,49 @@ nametable_swap_check_done:
   sta $2001
   rts
 
+animate_sprites:
+  ldx #$00
+animation_swap_check:
+  lda scroll
+  and #%00011111
+  eor #%00010000
+  bne animation_swap_check_done
+animation_swap:
+  lda animation_flag
+  eor #$01
+  sta animation_flag
+animation_swap_check_done:
+
+  bit $2002
+  ; pterodactyl
+
+  ; dino
+
+walk_animation:
+  lda animation_flag
+  cmp #$00
+  bne :+
+  lda #$35
+  sta $0229
+  lda #$36
+  sta $022d
+:
+  lda animation_flag
+  cmp #$01
+  bne :+
+  lda #$25
+  sta $0229
+  lda #$26
+  sta $022d
+:
+  rts
+jump_animation:
+  rts
+crouch_animation:
+  rts
+
+
+; 42 in decimal is how much in hex?  2a
 nmi:
   lda #$00
   sta $2003
@@ -299,10 +363,11 @@ nmi:
   lda game_state
   cmp #$01
   bne :+
+  inc score
+  jsr animate_sprites
   ; jsr check_collision
-  ; jsr update_score
-  ; jsr update_graphics
-  ; jsr update_level
+  ; jsr update_enemies
+  ; jsr parallax_clouds
   jsr scroll_level
 :
   rti
@@ -427,7 +492,7 @@ nametable_2400:
   .byte $09,$09,$09,$09,$09,$09,$09,$09,$09,$09,$09,$09,$09,$09,$09,$09
   .byte $09,$09,$09,$09,$09,$09,$09,$09,$09,$09,$09,$09,$09,$09,$09,$09
   .byte $09,$09,$09,$09,$09,$09,$09,$09,$09,$09,$09,$09,$09,$09,$09,$09
-  .byte $09,$1e,$1f,$2e,$2f,$3e,$3f,$4e,$4f,$09,$09,$09,$09,$09,$09,$09
+  .byte $09,$09,$09,$09,$09,$09,$09,$09,$09,$09,$09,$09,$09,$09,$09,$09
   .byte $30,$41,$42,$30,$41,$30,$31,$40,$41,$42,$40,$41,$41,$42,$40,$40
   .byte $40,$31,$40,$30,$40,$40,$40,$30,$31,$30,$31,$40,$42,$31,$30,$41
   .byte $09,$09,$09,$09,$09,$09,$09,$09,$09,$09,$09,$09,$09,$09,$09,$09
@@ -517,7 +582,7 @@ attribute:
   .byte %00000000,%00000000,%00000000,%00000000,%00000000,%00000000,%00000000,%00000000
   .byte %00000000,%00000000,%00000000,%00000000,%00000000,%00000000,%00000000,%00000000
 
-dino_sprite:
+sprites:
   ; .byte y, tile, attributes, x
   ; attributes: 
   ; 76543210
@@ -527,6 +592,7 @@ dino_sprite:
   ; ||+------ Priority (0: in front of background; 1: behind background)
   ; |+------- Flip sprite horizontally
   ; +-------- Flip sprite vertically
+  ; dino
   .byte $88, $04, %00000000, $20
   .byte $88, $05, %00000000, $28
   .byte $90, $12, %00000000, $10
@@ -539,6 +605,29 @@ dino_sprite:
   .byte $a0, $32, %00000000, $10
   .byte $a0, $33, %00000000, $18
   .byte $a0, $34, %00000000, $20
+  ; crouching dino
+  .byte $98, $0a, %00000000, $38
+  .byte $98, $0b, %00000000, $40
+  .byte $98, $0c, %00000000, $48
+  .byte $98, $0d, %00000000, $50
+  .byte $a0, $1a, %00000000, $38
+  .byte $a0, $1b, %00000000, $40
+  .byte $a0, $1c, %00000000, $48
+  ; large cactus
+  .byte $30, $0e, %00000000, $50
+  .byte $30, $0f, %00000000, $58
+  .byte $38, $1e, %00000000, $50
+  .byte $38, $1f, %00000000, $58
+  .byte $40, $2e, %00000000, $50
+  .byte $40, $2f, %00000000, $58
+  .byte $48, $3e, %00000000, $50
+  .byte $48, $3f, %00000000, $58
+  ; small cactus
+  ; large cactus cluster
+  ; small cactus cluster
+  ; mixed cactus cluster
+  ; pterodactyl
+  ; cloud
 
 score_sprite:
   ; .byte y, tile, attributes, x
